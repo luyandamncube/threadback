@@ -7,16 +7,17 @@ Threadback is a small Vercel-hosted utility for testing OAuth redirect/callback 
 It is intentionally minimal:
 
 * Vercel hosts a public HTTPS callback endpoint.
-* The callback page displays the returned `code`, `state`, and `scopes`.
-* Local scripts generate the provider auth URL and exchange the returned code for tokens.
-* Secrets and tokens stay local and are not stored by Vercel.
+* The callback stores the returned OAuth `code` by `state` for a short TTL.
+* Local scripts poll `/api/code?state=...` and exchange the returned code for tokens.
+* Secrets and access/refresh tokens stay local and are not stored by Vercel.
 
 ## Project structure
 
 ```text
 threadback/
 ├── api/
-│   ├── callback.js              # OAuth callback receiver
+│   ├── callback.js              # OAuth callback receiver; stores code by state
+│   ├── code.js                  # Local polling endpoint; returns code by state
 │   └── index.js                 # Small API landing page
 ├── public/
 │   ├── index.html               # Public landing page
@@ -44,8 +45,8 @@ Example flow:
 ```text
 OAuth provider
 → redirects to Threadback callback URL
-→ Threadback displays code/state/scopes
-→ copy code into local script
+→ Threadback stores code by state in short-lived KV storage
+→ local script polls /api/code?state=...
 → local script exchanges code for tokens
 → local API testing continues
 ```
@@ -57,7 +58,7 @@ Threadback is not a production auth system.
 It does not:
 
 * Persist users.
-* Store OAuth codes.
+* Store OAuth codes permanently. Codes are stored only temporarily for local polling.
 * Store access tokens.
 * Validate state server-side.
 * Manage sessions.
@@ -108,6 +109,48 @@ Your OAuth callback URL is:
 
 ```text
 https://threadback.vercel.app/api/callback
+```
+
+The local polling URL is:
+
+```text
+https://threadback.vercel.app/api/code
+```
+
+## Required Vercel environment variables
+
+Threadback needs a Vercel KV/Redis-compatible store for the short-lived OAuth code postbox. Set these in the Vercel project environment:
+
+```text
+KV_REST_API_URL=<your Upstash/Vercel KV REST URL>
+KV_REST_API_TOKEN=<your Upstash/Vercel KV REST token>
+```
+
+For Upstash Redis, these usually map to:
+
+```text
+KV_REST_API_URL=UPSTASH_REDIS_REST_URL
+KV_REST_API_TOKEN=UPSTASH_REDIS_REST_TOKEN
+```
+
+After adding or changing env vars, redeploy:
+
+```bash
+vercel --prod
+```
+
+## Verify the API routes
+
+Check the code endpoint returns JSON before a real OAuth run:
+
+```bash
+curl 'https://threadback.vercel.app/api/code?state=test&consume=true'
+```
+
+Expected when no code is stored:
+
+```json
+{"ok":false,"error":"not_found"}
 ```
 
 ## Verify the callback page
@@ -219,22 +262,44 @@ https://www.tiktok.com/v2/auth/authorize/?...
 
 Open the printed URL in your browser.
 
-After approving the TikTok login, TikTok should redirect to Threadback and show:
+After approving the TikTok login, TikTok redirects to Threadback. Threadback stores the returned `code` by `state` for a short TTL and shows a success page containing the `state`, `scopes`, and expiry window. It no longer needs to display the code for the automated flow.
 
-```text
-code
-state
-scopes
+## Retrieve the code from the postbox
+
+Local scripts or Stitchly can poll the code endpoint with the generated `state`:
+
+```bash
+curl 'https://threadback.vercel.app/api/code?state=STATE_FROM_AUTH_URL&consume=true'
 ```
 
-Do not share the code publicly.
+When no code has arrived yet, the expected response is:
+
+```json
+{"ok":false,"error":"not_found"}
+```
+
+When the callback has stored a code, the expected response is:
+
+```json
+{
+  "ok": true,
+  "code": "...",
+  "state": "...",
+  "scopes": "user.info.basic,video.list",
+  "receivedAt": "..."
+}
+```
+
+By default `consume=true` deletes the code after it is read. Use `consume=false` only while debugging.
 
 ## Exchange the code for tokens
 
-Copy the `code` from the Threadback callback page and run:
+The recommended flow is for a local script or Stitchly pipeline to exchange the code after reading `/api/code`. Token exchange still happens locally so TikTok client secrets and access/refresh tokens do not live in Threadback.
+
+Manual fallback:
 
 ```bash
-./scripts/tiktok_exchange_code.py 'PASTE_CODE_FROM_CALLBACK_PAGE'
+./scripts/tiktok_exchange_code.py 'PASTE_CODE_FROM_API_CODE_RESPONSE'
 ```
 
 If successful, the script prints the token response and saves it locally:
@@ -266,9 +331,29 @@ refresh_token
 open_id
 ```
 
+## Stitchly pipeline usage
+
+For Stitchly v2, Threadback acts as a tiny OAuth postbox:
+
+```text
+Stitchly Make Auth URL node
+→ browser approval at TikTok
+→ TikTok redirects to /api/callback
+→ Threadback stores code by state
+→ Stitchly Wait And Exchange Auth node polls /api/code
+→ Stitchly exchanges code locally and stores tokens locally
+```
+
+Set Stitchly/local env values to:
+
+```bash
+export TIKTOK_REDIRECT_URI="https://threadback.vercel.app/api/callback"
+export TIKTOK_CALLBACK_CODE_URL="https://threadback.vercel.app/api/code"
+```
+
 ## Testing TikTok API calls
 
-Once `.tiktok_tokens.json` exists, local scripts can read the access token and call TikTok APIs.
+Once the local token file exists, local scripts can read the access token and call TikTok APIs.
 
 For example, your local tests can call:
 
@@ -277,6 +362,8 @@ GET  /v2/user/info/
 POST /v2/video/list/
 ```
 
+TikTok can return an `error` object with `code: "ok"` on successful responses. Do not treat every `error` object as a failure; check the `code` field.
+
 Keep API testing scripts local or commit only generic reusable versions that do not include secrets or tokens.
 
 ## Git safety checks
@@ -284,10 +371,10 @@ Keep API testing scripts local or commit only generic reusable versions that do 
 Before committing, check that local secret/token files are ignored:
 
 ```bash
-git check-ignore .env.tiktok .tiktok_tokens.json
+git check-ignore .env.tiktok .tiktok_tokens.json .env.local
 ```
 
-Both should be ignored.
+They should be ignored.
 
 Recommended commit:
 
@@ -307,8 +394,9 @@ vercel --prod
 ## Notes
 
 * Threadback is designed for sandbox/dev OAuth testing.
-* The callback endpoint only displays returned query parameters.
-* Token exchange is done locally by `scripts/tiktok_exchange_code.py`.
-* Secrets should stay in local env files.
-* Tokens should stay in local ignored files.
+* The callback endpoint stores returned OAuth codes temporarily by `state`.
+* `/api/code` returns and optionally consumes the short-lived code for local scripts.
+* Token exchange is done locally by `scripts/tiktok_exchange_code.py` or by a local Stitchly pipeline.
+* TikTok client secrets should stay in local env files or local pipeline secret storage.
+* Access and refresh tokens should stay in local ignored files.
 * Replace placeholder privacy and terms pages before any production usage.

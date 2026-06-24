@@ -1,4 +1,6 @@
-export default function handler(req, res) {
+const TTL_SECONDS = Number(process.env.OAUTH_CODE_TTL_SECONDS || "600");
+
+export default async function handler(req, res) {
   const { code, state, scopes, scope, error, error_description } = req.query;
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -10,21 +12,79 @@ export default function handler(req, res) {
       sections: [
         ["error", error],
         ["description", error_description || ""],
+        ["state", state || ""],
       ],
       footer: "Return to your terminal/app and try the auth flow again."
     }));
   }
 
+  if (!code || !state) {
+    return res.status(400).send(renderPage({
+      title: "TikTok auth callback missing code or state",
+      sections: [
+        ["code", code || ""],
+        ["state", state || ""],
+      ],
+      footer: "The local polling script needs both code and state."
+    }));
+  }
+
+  const storage = await getStorage();
+  if (!storage.ok) {
+    return res.status(500).send(renderPage({
+      title: "TikTok auth callback storage error",
+      intro: "The callback received a code, but could not store it for the local polling script.",
+      sections: [
+        ["error", storage.error],
+        ["message", storage.message || ""],
+        ["state", state || ""],
+      ],
+      footer: "Check the Vercel KV/Redis environment variables, then try the auth flow again."
+    }));
+  }
+
+  await storage.kv.set(
+    `tiktok-oauth:${state}`,
+    {
+      code,
+      state,
+      scopes: scopes || scope || "",
+      receivedAt: new Date().toISOString(),
+    },
+    { ex: TTL_SECONDS }
+  );
+
   return res.status(200).send(renderPage({
     title: "TikTok auth callback received",
-    intro: "Copy this code back into your local token exchange script.",
+    intro: "The authorization code was stored. Your local Stitchly pipeline can now continue.",
     sections: [
-      ["code", code || ""],
       ["state", state || ""],
       ["scopes", scopes || scope || ""],
+      ["expires_in_seconds", String(TTL_SECONDS)],
     ],
-    footer: "You can close this tab after copying the code."
+    footer: "You can close this tab."
   }));
+}
+
+async function getStorage() {
+  try {
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      return {
+        ok: false,
+        error: "missing_kv_env",
+        message: "Set KV_REST_API_URL and KV_REST_API_TOKEN in Vercel.",
+      };
+    }
+
+    const { kv } = await import("@vercel/kv");
+    return { ok: true, kv };
+  } catch (error) {
+    return {
+      ok: false,
+      error: "storage_import_failed",
+      message: error?.message || String(error),
+    };
+  }
 }
 
 function renderPage({ title, intro = "", sections = [], footer = "" }) {

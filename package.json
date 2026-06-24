@@ -14,5 +14,8 @@
     "callback",
     "vercel"
   ],
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@vercel/kv": "^3.0.0"
+  }
 }
