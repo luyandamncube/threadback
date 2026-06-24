@@ -1,0 +1,18 @@
+{
+  "name": "threadback",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny reusable OAuth callback receiver for dev/test auth flows.",
+  "scripts": {
+    "deploy": "vercel --prod",
+    "dev": "vercel dev"
+  },
+  "keywords": [
+    "tiktok",
+    "oauth",
+    "callback",
+    "vercel"
+  ],
+  "license": "UNLICENSED"
+}
