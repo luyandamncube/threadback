@@ -8,3 +8,4 @@ node_modules/
 .tiktok_tokens.json
 __pycache__/
 *.pyc
+.vercel

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy | Threadback</title>
+  <style>
+
+:root {
+  color-scheme: light dark;
+  --bg: #f7f4ef;
+  --text: #1f2933;
+  --muted: #5f6c7b;
+  --card: #ffffff;
+  --border: #ddd6cc;
+  --accent: #6f4bd8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111318;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --card: #181b22;
+    --border: #2b303b;
+    --accent: #a78bfa;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 20px;
+}
+
+nav {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+  font-size: 0.95rem;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+  margin: 0 0 20px;
+}
+
+h2 {
+  margin-top: 36px;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 16px 0;
+}
+
+.lede {
+  font-size: 1.25rem;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.card {
+  margin: 28px 0;
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="/index.html">Home</a>
+      <a href="/api/callback">Callback</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+    </nav>
+
+    <h1>Privacy Policy</h1>
+
+    
+          <p class="muted">Last updated: 2026-06-24</p>
+
+          <p>
+            Threadback is a developer testing utility for receiving OAuth callback redirects.
+            This placeholder policy describes the intended test usage of this project.
+          </p>
+
+          <h2>Information received</h2>
+          <p>
+            When an OAuth provider redirects to Threadback, the callback URL may include
+            temporary query parameters such as an authorization code, state value, scope,
+            or error details.
+          </p>
+
+          <h2>How information is used</h2>
+          <p>
+            The callback page displays the received OAuth parameters in the browser so the
+            developer can copy them into a local test script. Threadback does not intentionally
+            store, sell, or share this information.
+          </p>
+
+          <h2>Developer responsibility</h2>
+          <p>
+            OAuth authorization codes and tokens can be sensitive. Developers using this
+            project should avoid sharing callback URLs, logs, screenshots, or copied codes
+            publicly.
+          </p>
+
+          <h2>Contact</h2>
+          <p>
+            This is a placeholder page for development and sandbox testing. Replace this
+            section with your real contact details before using the project in production.
+          </p>
+
+          <p class="muted">
+            This placeholder is not legal advice. Replace it with a reviewed policy before
+            using Threadback with real users.
+          </p>
+        
+
+    <footer>
+      Threadback — A tiny OAuth callback postbox for dev flows.
+    </footer>
+  </main>
+</body>
+</html>
